@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RSVP Dashboard — Nisamudheen &amp; Shamnitha</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<style>
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .login-card{max-width:360px;width:100%;padding:44px 36px;text-align:center}
+  .login-card h1{font-size:26px;margin:0 0 8px}
+  .login-card p.sub{font-size:13px;color:rgba(59,46,40,.55);margin:0 0 28px}
+  #loginError{font-size:12px;color:#9A4B3F;margin:14px 0 0;min-height:16px}
+
+  #adminRoot{position:relative;z-index:2;min-height:100vh;padding:56px 24px 96px;display:none}
+  .admin-wrap{max-width:920px;margin:0 auto}
+  .admin-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:8px}
+  .admin-title{font-size:clamp(26px,4vw,36px);margin:0}
+  .admin-actions{display:flex;align-items:center;gap:14px}
+  .admin-btn{border:1px solid rgba(183,110,121,.4);background:transparent;color:var(--rose-deep);
+    font-family:Jost,sans-serif;font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    padding:10px 18px;border-radius:2px;cursor:pointer;transition:background-color .3s ease,color .3s ease;
+    text-decoration:none;display:inline-block}
+  .admin-btn:hover{background:var(--rose-deep);color:var(--ivory)}
+  .admin-status{font-size:13px;color:rgba(59,46,40,.55);margin:28px 0}
+  .admin-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:32px}
+  .admin-stat{padding:26px;text-align:center}
+  .stat-num{font-family:'Playfair Display',serif;font-size:34px;margin:0;font-variant-numeric:tabular-nums}
+  .stat-label{font-size:10px;letter-spacing:.25em;text-transform:uppercase;color:rgba(59,46,40,.45);margin:6px 0 0}
+  .admin-table-card{padding:8px}
+  .admin-table-scroll{overflow-x:auto}
+  .admin-table{width:100%;border-collapse:collapse;font-size:14px;min-width:520px}
+  .admin-table th{text-align:left;font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+    color:rgba(140,79,88,.7);padding:16px 20px;border-bottom:1px solid rgba(183,110,121,.25);white-space:nowrap}
+  .admin-table td{padding:14px 20px;border-bottom:1px solid rgba(183,110,121,.12);white-space:nowrap}
+  .admin-table td.num{font-variant-numeric:tabular-nums}
+  .admin-table td.muted{color:rgba(59,46,40,.5);font-size:12px}
+  .admin-empty{padding:48px;text-align:center;color:rgba(59,46,40,.45);font-size:13px}
+</style>
+</head>
+<body>
+
+<div class="texture">
+  <div class="lattice"></div>
+  <div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
+</div>
+
+<div class="login-wrap" id="loginWrap">
+  <form class="card login-card" id="loginForm">
+    <h1>RSVP Dashboard</h1>
+    <p class="sub">Nisamudheen &amp; Shamnitha &middot; enter the admin password to continue</p>
+    <div style="text-align:left">
+      <label for="password">Password</label>
+      <input id="password" type="password" required placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password">
+    </div>
+    <button type="submit" style="margin-top:20px">View Responses</button>
+    <p id="loginError"></p>
+  </form>
+</div>
+
+<div id="adminRoot">
+  <div class="admin-wrap">
+    <header class="admin-header">
+      <div>
+        <p class="eyebrow" style="margin:0 0 6px">RSVP Dashboard</p>
+        <h1 class="admin-title">Nisamudheen &amp; Shamnitha</h1>
+      </div>
+      <div class="admin-actions">
+        <a href="/" class="admin-btn">&larr; View Invitation</a>
+        <button type="button" id="refreshBtn" class="admin-btn">Refresh</button>
+        <button type="button" id="exportBtn" class="admin-btn">Export CSV</button>
+      </div>
+    </header>
+
+    <p class="admin-status" id="adminStatus">Loading responses&hellip;</p>
+
+    <div class="admin-stats">
+      <div class="card admin-stat"><p class="stat-num" id="statTotal">0</p><p class="stat-label">Responses</p></div>
+      <div class="card admin-stat"><p class="stat-num" id="statAttending">0</p><p class="stat-label">Attending</p></div>
+      <div class="card admin-stat"><p class="stat-num" id="statGuests">0</p><p class="stat-label">Guests Attending</p></div>
+    </div>
+
+    <div class="card admin-table-card">
+      <div class="admin-table-scroll">
+        <table class="admin-table" id="adminTable">
+          <thead><tr><th>Name</th><th>Guests</th><th>Status</th><th>Submitted</th></tr></thead>
+          <tbody id="adminTbody"></tbody>
+        </table>
+      </div>
+      <div class="admin-empty" id="adminEmpty" style="display:none">No responses yet.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var STORAGE_KEY = 'nikkah_admin_pw';
+  var rows = [];
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function toCsv(list) {
+    var header = ['Name', 'Guests', 'Attending', 'Submitted'];
+    var lines = [header.join(',')];
+    list.forEach(function (r) {
+      var line = [r.name || '', r.guests != null ? r.guests : '', r.attending || '', r.submitted_at || '']
+        .map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+      lines.push(line);
+    });
+    return lines.join('\r\n');
+  }
+
+  function render(list) {
+    var attending = list.filter(function (r) { return r.attending === 'yes'; });
+    var totalGuests = attending.reduce(function (sum, r) { return sum + (parseInt(r.guests, 10) || 0); }, 0);
+    document.getElementById('statTotal').textContent = list.length;
+    document.getElementById('statAttending').textContent = attending.length;
+    document.getElementById('statGuests').textContent = totalGuests;
+
+    var tbody = document.getElementById('adminTbody');
+    var tableEl = document.getElementById('adminTable');
+    var emptyEl = document.getElementById('adminEmpty');
+    document.getElementById('adminStatus').textContent = '';
+
+    if (!list.length) {
+      tableEl.style.display = 'none';
+      emptyEl.style.display = 'block';
+      return;
+    }
+    tableEl.style.display = '';
+    emptyEl.style.display = 'none';
+    tbody.innerHTML = list.map(function (r) {
+      var isYes = r.attending === 'yes';
+      var when = r.submitted_at ? new Date(r.submitted_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+      return '<tr>' +
+        '<td>' + escapeHtml(r.name || 'Unnamed') + '</td>' +
+        '<td class="num">' + (r.guests != null ? escapeHtml(r.guests) : '—') + '</td>' +
+        '<td><span class="pill ' + (isYes ? 'pill-yes' : 'pill-no') + '">' + (isYes ? 'Attending' : 'Not attending') + '</span></td>' +
+        '<td class="muted">' + when + '</td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function loadData(password) {
+    var status = document.getElementById('adminStatus');
+    status.textContent = 'Loading responses…';
+    return fetch('/api/admin', { headers: { 'x-admin-password': password } }).then(function (res) {
+      if (res.status === 401) throw { code: 401 };
+      if (!res.ok) throw { code: res.status };
+      return res.json();
+    }).then(function (data) {
+      rows = data.rows || [];
+      render(rows);
+    });
+  }
+
+  function showDashboard(password) {
+    document.getElementById('loginWrap').style.display = 'none';
+    document.getElementById('adminRoot').style.display = 'block';
+    loadData(password).catch(function (err) {
+      document.getElementById('adminStatus').textContent =
+        err.code === 401 ? 'Session expired — refresh and sign in again.' : 'Could not load responses. Try refreshing.';
+    });
+  }
+
+  document.getElementById('loginForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var pw = document.getElementById('password').value;
+    var errEl = document.getElementById('loginError');
+    errEl.textContent = '';
+    loadData(pw).then(function () {
+      sessionStorage.setItem(STORAGE_KEY, pw);
+      showDashboard(pw);
+    }).catch(function (err) {
+      errEl.textContent = err.code === 401 ? 'Incorrect password.' : 'Could not reach the server — try again.';
+    });
+  });
+
+  document.getElementById('refreshBtn').addEventListener('click', function () {
+    var pw = sessionStorage.getItem(STORAGE_KEY);
+    if (pw) loadData(pw);
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', function () {
+    var blob = new Blob([toCsv(rows)], { type: 'text/csv' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'nikkah-walima-rsvps.csv'; a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  });
+
+  var saved = sessionStorage.getItem(STORAGE_KEY);
+  if (saved) showDashboard(saved);
+})();
+</script>
+</body>
+</html>
