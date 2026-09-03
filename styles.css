@@ -70,3 +70,15 @@ button[type="submit"]:disabled{opacity:.6;cursor:default;transform:none}
 @media (prefers-reduced-motion: reduce){
   [data-reveal]{opacity:1 !important;transform:none !important}
 }
+
+/* Mobile GPUs choke on background-attachment:fixed (repaints the whole
+   gradient every scroll frame) and on stacked heavy blurs — scale both
+   back here since the visual difference is negligible on a small screen. */
+@media (max-width: 640px){
+  body{background-attachment:scroll}
+  .g1{filter:blur(28px)}
+  .g2{filter:blur(30px)}
+  .g3{filter:blur(32px)}
+  .card{backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+  .modal-overlay{backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+}
